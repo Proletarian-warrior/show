@@ -6,11 +6,32 @@ VAR num inc2:= 0;
 VAR num inc3:= 0;
 VAR num inc4:= 0;
 VAR num inc5:= 0;
-VAR speeddata moveSpeed;
+VAR speeddata VelocityVariable;
+VAR rawbytes data;
 VAR socketdev server;
 VAR socketdev client;
-TASK PERS tooldata PKI_500:=[TRUE,[[0,0,0],[1,0,0,0]],[-1,[0,0,0],[1,0,0,0],0,0,0]]; 
+VAR string message;
+VAR string string1:="";
+VAR string string2{4}:=["","","",""];
+VAR bool flag1:=FALSE;
+VAR jointtarget jp;
+VAR string s1;
+VAR string s2;
+VAR num Rx;
+VAR num Ry;
+VAR num Rz;
+VAR pose object;
+VAR robtarget init:=[[938.09,0.00,1012.15],[0.367915,0,0.92986,0],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+VAR pose objectb;
+VAR num X;
+VAR num Y;
+VAR num Z;
+TASK PERS tooldata PKI_500:=[TRUE,[[0,0,0],[1,0,0,0]],[-1,[0,0,0],[1,0,0,0],0,0,0]];
+CONST robtarget p10:=[[942.71,459.79,1187.61],[0.688984,-0.159064,0.688984,0.159064],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+ 
     PROC main()
+! Go Home
+!MoveAbsj [[0,0,0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]], vmax, z100, tool0;
 !create communication  
       SocketClose server;
       SocketCreate server;
@@ -20,76 +41,121 @@ TASK PERS tooldata PKI_500:=[TRUE,[[0,0,0],[1,0,0,0]],[-1,[0,0,0],[1,0,0,0],0,0,
         TPErase;
 !send a meassage to the client 
        !SocketSend client,\Str:="Hello client ! "; 
-       MoveAbsj [[0,0,0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]], vmax, z100, tool0;
       WHILE TRUE DO
            a:
 !receive a message from the client
       SocketReceive client,\Data:=receivedData \ReadNoOfBytes:=1024 \Time:= WAIT_MAX;
-IF receivedData{1}=1 THEN !move robot with moveABbsj
-!IF you want use the MoveL/MoveJ you can use 0 or others mark ,and also different data Data protocol     
-      IF receivedData{2}=0 THEN   !Enterpertor,Parse data message
-      inc:=-receivedData{3};      !Joint1 0 is negative, 1 is positive.
+      !VelocityVariable choose--need to solve !
+      
+      !Identifier is 1 ,get joints values ,moveabsj
+      IF receivedData{1}=1 THEN
+          movejoint;
+      ENDIF
+      IF receivedData{1}=2 THEN
+          changeRPY;
+      ENDIF
+      IF receivedData{1}=3 THEN
+          changeXYZ;
+      ENDIF
+      IF receivedData{1}=4 THEN
+          changeXYZandRPY;
+      ENDIF
+      GOTO a; 
+      ENDWHILE     
+    ENDPROC
+    
+    
+    PROC movejoint()
+      IF receivedData{2}=0 THEN
+      inc:=-receivedData{3};
           ELSE
       inc:=receivedData{3};
       ENDIF
-      !joint2
         IF receivedData{4}=0 THEN
       inc1:=-receivedData{5};
           ELSE
       inc1:=receivedData{5};
       ENDIF
-      !joint3
         IF receivedData{6}=0 THEN
       inc2:=-receivedData{7};
           ELSE
       inc2:=receivedData{7};
       ENDIF
-      !joint4
         IF receivedData{8}=0 THEN
       inc3:=-receivedData{9};
           ELSE
       inc3:=receivedData{9};
       ENDIF
-      !joint5
         IF receivedData{10}=0 THEN
       inc4:=-receivedData{11};
           ELSE
       inc4:=receivedData{11};
       ENDIF
-      !joint6
        IF receivedData{12}=0 THEN
       inc5:=-receivedData{13};
           ELSE
       inc5:=receivedData{13};
       ENDIF
-IF receivedData{14}= 1 THEN !speed
-        moveSpeed:= v60;
-            ELSEIF receivedData{14}= 2 THEN
-        moveSpeed:= v100;
-            ELSEIF receivedData{14}= 3 THEN
-        moveSpeed:= v200;
-            ELSEIF receivedData{14}= 4 THEN
-        moveSpeed:= v300;
-            ELSEIF receivedData{14}= 5 THEN
-        moveSpeed:= v500;
-            ELSEIF receivedData{14}= 6 THEN
-        moveSpeed:= v600;
-            ELSEIF receivedData{14}= 7 THEN
-        moveSpeed:= v800;
-            ELSEIF receivedData{14}= 8 THEN
-        moveSpeed:= v1000;
-            ELSEIF receivedData{14}= 9 THEN
-        moveSpeed:= v2500;
-            ELSEIF receivedData{14}= 10 THEN
-        moveSpeed:= v3000;
-         ELSEIF receivedData{14}= 11 THEN
-        moveSpeed:= v6000;
-ENDIF
        !jog move mode        
-      MoveAbsj[[inc,inc1,inc2,inc3,inc4,inc5],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]],moveSpeed, z200, tool0;   
-       !jog move mode
-      GOTO a;
-ENDIF 
-      ENDWHILE
-    ENDPROC      
+      MoveAbsj[[inc,inc1,inc2,inc3,inc4,inc5],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]],vmax, fine, tool0;  
+       !read joint data and show in the TP screen
+      TPErase;
+       jp:=CJointT();
+       s1:="J1:"+NumToStr(jp.robax.rax_1,2)+",";
+       s1:=s1+"J2:"+NumToStr(jp.robax.rax_2,2)+",";
+       s1:=s1+"J3:"+NumToStr(jp.robax.rax_3,2);
+       s2:="J4:"+NumToStr(jp.robax.rax_4,2)+",";
+       s2:=s2+"J5:"+NumToStr(jp.robax.rax_5,2)+",";
+       s2:=s2+"J6:"+NumToStr(jp.robax.rax_6,2)+",";
+       TPWrite s1;
+       TPWrite s2;  
+     ENDPROC
+ 
+     
+    PROC changeRPY()
+      IF receivedData{2}=0 THEN
+     Rz:=-receivedData{3};
+          ELSE
+     Rz:=receivedData{3};
+      ENDIF
+        IF receivedData{4}=0 THEN
+      Ry:=-receivedData{5};
+          ELSE
+      Ry:=receivedData{5};
+      ENDIF
+        IF receivedData{6}=0 THEN
+     Rx:=-receivedData{7};
+          ELSE
+     Rx:=receivedData{7};
+      ENDIF   
+     init.rot := OrientZYX(Rz, Ry, Rx);
+     ! init.rot:=objectb.rot;
+      SingArea \Wrist;
+      MoveJ init,vmax,fine,tool0;
+    ENDPROC
+    
+    PROC changeXYZ()
+     IF receivedData{2}=0 THEN
+     X:=-receivedData{3};
+          ELSE
+     X:=receivedData{3};
+      ENDIF
+        IF receivedData{4}=0 THEN
+      Y:=-receivedData{5};
+          ELSE
+      Y:=receivedData{5};
+      ENDIF
+        IF receivedData{6}=0 THEN
+     Z:=-receivedData{7};
+          ELSE
+     Z:=receivedData{7};
+      ENDIF        
+      SingArea \Wrist; 
+     MoveL Offs(p10,X,Y,Z), vmax, fine, tool0;
+    ENDPROC
+    PROC changeXYZandRPY()
+      ConfJ \Off;
+   
+    ENDPROC
+    
 ENDMODULE
